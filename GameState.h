@@ -1,26 +1,34 @@
 #pragma once
-#include "Vec3.h"
 #include <vector>
+#include "Vec3.h"
+
+struct Rotation {
+    float pitch{ 0.f };
+    float yaw{ 0.f };
+    float roll{ 0.f };
+};
 
 struct BallState {
-    Vec3 position;
-    Vec3 velocity;
+    Vec3 pos{};
+    Vec3 vel{};
 };
 
 struct CarState {
-    Vec3 position;
-    Vec3 velocity;
-    struct {
-        float pitch;
-        float yaw;
-        float roll;
-    } rotation;
-    bool isDemolished = false;
-    float boost = 0.0f;
+    Vec3 pos{};
+    Vec3 vel{};
+    Rotation rotation{};
+    float boost{ 0.f };
+    bool isDemolished{ false };
 };
 
 struct GameState {
-    BallState ball;
-    std::vector<CarState> cars;
-    CarState car; // convenience: "our" car
+    BallState ball{};
+    CarState  car{};
+    std::vector<CarState> cars{};
 };
+
+// Legacy aliases so older code using .position/.velocity still works
+#ifndef RLSDK_NO_LEGACY_ALIASES
+#define position pos
+#define velocity vel
+#endif
