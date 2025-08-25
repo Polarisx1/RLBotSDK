@@ -11,9 +11,13 @@
 #include "RLController.h"
 #include "MemoryUtils.h"
 #include "MemoryReader.h"
+#include "GameState.h"
 
 using json = nlohmann::json;
 
+// --------------------------------------------------
+// Utility: find process by name
+// --------------------------------------------------
 DWORD GetProcessIdByName(const std::wstring& processName) {
     PROCESSENTRY32W entry{ sizeof(entry) };
     HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
@@ -30,6 +34,9 @@ DWORD GetProcessIdByName(const std::wstring& processName) {
     return 0;
 }
 
+// --------------------------------------------------
+// Utility: get base module addr
+// --------------------------------------------------
 uintptr_t GetModuleBaseAddress(DWORD procId, const std::wstring& modName) {
     uintptr_t modBaseAddr = 0;
     HANDLE hSnap = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE | TH32CS_SNAPMODULE32, procId);
@@ -48,6 +55,9 @@ uintptr_t GetModuleBaseAddress(DWORD procId, const std::wstring& modName) {
     return modBaseAddr;
 }
 
+// --------------------------------------------------
+// Main
+// --------------------------------------------------
 int main() {
     DWORD pid = GetProcessIdByName(L"RocketLeague.exe");
     if (!pid) {
@@ -61,7 +71,7 @@ int main() {
     std::cout << "[*] Attached to Rocket League (PID " << pid << ")\n";
     std::cout << "[*] Base address: 0x" << std::hex << base << std::dec << "\n";
 
-    // Load offsets
+    // Load offsets.json
     std::ifstream f("offsets.json");
     if (!f.is_open()) {
         std::cout << "[!] Missing offsets.json\n";
@@ -81,14 +91,16 @@ int main() {
     std::cout << "[+] GObjects absolute: 0x" << std::hex << gobjectsAbs << "\n";
     std::cout << "[+] Controller absolute: 0x" << std::hex << controllerAddr << "\n";
 
+    // Init bot manager
     BotManager manager;
     manager.addBot(std::make_unique<DummyBot>());
     manager.addBot(std::make_unique<NextoBot>());
-
     std::cout << "[*] Bot framework ready. Use F1/F2 to select, F3 to toggle.\n";
 
+    // Memory reader
     MemoryReader reader(hProc);
 
+    // Resolve UWorld
     uintptr_t uWorld = reader.findUWorld(base, gobjectsAbs);
     if (!uWorld) {
         std::cout << "[!] UWorld not found.\n";
@@ -96,17 +108,19 @@ int main() {
     }
     std::cout << "[+] UWorld (pattern) at 0x" << std::hex << uWorld << "\n";
 
-    // Debug: Try to resolve ActorArray
-    uintptr_t actorArray = reader.debugFindActorArray(uWorld);  // ✅ fixed name
+    // Try to resolve ActorArray
+    uintptr_t actorArray = reader.debugFindActorArray(uWorld);
     if (!actorArray) {
         std::cout << "[!] Could not resolve ActorArray.\n";
         return 1;
     }
 
+    // ------------------------------
+    // Main bot loop
+    // ------------------------------
     while (true) {
         GameState game;
 
-        // Example: search for Ball and Car
         uintptr_t ballAddr = reader.findActor("Ball_TA", actorArray, gnamesAbs);
         uintptr_t carAddr = reader.findActor("Car_TA", actorArray, gnamesAbs);
 
@@ -115,6 +129,9 @@ int main() {
             game.cars.clear();
             game.cars.push_back(reader.getCar(carAddr));
             game.car = game.cars[0];
+        }
+        else {
+            std::cout << "[WARN] Could not resolve Ball/Car this frame.\n";
         }
 
         ControllerState input = manager.run(game);
@@ -129,8 +146,11 @@ int main() {
         rlInput.jump = input.jump ? 1 : 0;
         rlInput.boost = input.boost ? 1 : 0;
 
-        WriteMemory(hProc, controllerAddr, rlInput);
-        Sleep(16);
+        if (!WriteMemory(hProc, controllerAddr, rlInput)) {
+            std::cout << "[!] Failed to write controller state.\n";
+        }
+
+        Sleep(16); // ~60fps
     }
 
     return 0;

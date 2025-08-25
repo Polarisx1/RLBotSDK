@@ -128,7 +128,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="MemoryReader.cpp" />
-    <ClCompile Include="RLBotSDK.cpp" />
+    <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\Downloads\json.hpp" />
@@ -143,6 +143,9 @@
     <ClInclude Include="PatternScan.h" />
     <ClInclude Include="RLController.h" />
     <ClInclude Include="Vec3.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include=".gitignore" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
